@@ -6,7 +6,10 @@ import { UserButton } from "@clerk/nextjs";
 
 const navLinks = [
   { href: "/", label: "Dashboard" },
-  { href: "/tasks", label: "Tasks" }
+  { href: "/tasks", label: "Tasks" },
+  { href: "/calendar", label: "Calendar" },
+  { href: "/docs", label: "Docs" },
+  { href: "/team", label: "Team" }
 ];
 
 function isActiveLink(pathname: string, href: string) {

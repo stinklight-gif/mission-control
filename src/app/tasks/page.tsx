@@ -1,4 +1,8 @@
-import { createClient } from "@/lib/supabase";
+"use client";
+
+import { createClient } from "@supabase/supabase-js";
+import { useEffect, useMemo, useState } from "react";
+import TaskDrawer from "@/components/TaskDrawer";
 
 type Task = {
   id: string;
@@ -74,14 +78,17 @@ function StatCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-function TaskCard({ task }: { task: Task }) {
+function TaskCard({ task, onClick }: { task: Task; onClick: () => void }) {
   const dotColor = statusDot[task.status] ?? "bg-slate-500";
   const isBlocked = task.status === "blocked";
   const createdAt = formatRelativeTime(task.created_at);
   const dueDate = formatDueDate(task.due_date);
 
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+    <div
+      className="cursor-pointer rounded-2xl border border-slate-800 bg-slate-900/60 p-4 transition hover:border-slate-600"
+      onClick={onClick}
+    >
       <div className="flex items-start gap-3">
         <span className={`mt-1 h-2.5 w-2.5 rounded-full ${dotColor}`} />
         <div className="flex-1">
@@ -107,11 +114,13 @@ function TaskCard({ task }: { task: Task }) {
 function Column({
   title,
   titleClass,
-  tasks
+  tasks,
+  onTaskClick
 }: {
   title: string;
   titleClass: string;
   tasks: Task[];
+  onTaskClick: (task: Task) => void;
 }) {
   return (
     <div className="flex flex-col gap-4">
@@ -125,33 +134,62 @@ function Column({
             No tasks yet.
           </div>
         ) : (
-          tasks.map((task) => <TaskCard key={task.id} task={task} />)
+          tasks.map((task) => (
+            <TaskCard key={task.id} task={task} onClick={() => onTaskClick(task)} />
+          ))
         )}
       </div>
     </div>
   );
 }
 
-export default async function TasksPage() {
-  const supabase = createClient();
+export default function TasksPage() {
+  const supabase = useMemo(
+    () =>
+      createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        { auth: { persistSession: false } }
+      ),
+    []
+  );
 
-  const { data: tasksData, error: tasksError } = await supabase
-    .from("tasks")
-    .select("*")
-    .order("created_at", { ascending: false });
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [activity, setActivity] = useState<AgentActivity[]>([]);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
 
-  if (tasksError) console.error("Supabase error:", tasksError.message);
+  useEffect(() => {
+    let isActive = true;
 
-  const { data: activityData, error: activityError } = await supabase
-    .from("agent_activity")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(10);
+    const loadData = async () => {
+      const { data: tasksData, error: tasksError } = await supabase
+        .from("tasks")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-  if (activityError) console.error("Supabase error:", activityError.message);
+      if (tasksError) console.error("Supabase error:", tasksError.message);
 
-  const tasks = (tasksData ?? []) as Task[];
-  const activity = (activityData ?? []) as AgentActivity[];
+      const { data: activityData, error: activityError } = await supabase
+        .from("agent_activity")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      if (activityError) console.error("Supabase error:", activityError.message);
+
+      if (isActive) {
+        setTasks((tasksData ?? []) as Task[]);
+        setActivity((activityData ?? []) as AgentActivity[]);
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isActive = false;
+    };
+  }, [supabase]);
 
   const blocked = tasks.filter((task) => task.status === "blocked");
   const inProgress = tasks.filter((task) => task.status === "in_progress");
@@ -160,10 +198,54 @@ export default async function TasksPage() {
   const done = tasks.filter((task) => task.status === "done").length;
   const percentDone = total > 0 ? Math.round((done / total) * 100) : 0;
 
+  const handleOpenNew = () => {
+    setActiveTask(null);
+    setDrawerOpen(true);
+  };
+
+  const handleOpenTask = (task: Task) => {
+    setActiveTask(task);
+    setDrawerOpen(true);
+  };
+
+  const handleCloseDrawer = () => {
+    setDrawerOpen(false);
+    setActiveTask(null);
+  };
+
+  const handleSaveTask = (saved: Task) => {
+    setTasks((prev) => {
+      const index = prev.findIndex((task) => task.id === saved.id);
+      if (index === -1) return [saved, ...prev];
+      const updated = [...prev];
+      updated[index] = saved;
+      return updated;
+    });
+    handleCloseDrawer();
+  };
+
+  const handleDeleteTask = (id: string) => {
+    setTasks((prev) => prev.filter((task) => task.id !== id));
+    handleCloseDrawer();
+  };
+
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
       <section className="mx-auto w-full max-w-6xl px-6 pt-8">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Mission Control</p>
+            <h1 className="mt-2 text-2xl font-semibold text-slate-100">Task Board</h1>
+          </div>
+          <button
+            type="button"
+            onClick={handleOpenNew}
+            className="rounded-full border border-slate-800 bg-slate-900/60 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:border-slate-600 hover:text-white"
+          >
+            + New Task
+          </button>
+        </div>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard label="Blocked" value={`${blocked.length}`} />
           <StatCard label="In Progress" value={`${inProgress.length}`} />
           <StatCard label="Total" value={`${total}`} />
@@ -174,9 +256,24 @@ export default async function TasksPage() {
       <section className="mx-auto w-full max-w-6xl px-6 pb-12 pt-8">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
           <div className="grid gap-6 lg:grid-cols-3">
-            <Column title="Backlog" titleClass="text-slate-400" tasks={backlog} />
-            <Column title="In Progress" titleClass="text-blue-400" tasks={inProgress} />
-            <Column title="Blocked 🚫" titleClass="text-red-400" tasks={blocked} />
+            <Column
+              title="Backlog"
+              titleClass="text-slate-400"
+              tasks={backlog}
+              onTaskClick={handleOpenTask}
+            />
+            <Column
+              title="In Progress"
+              titleClass="text-blue-400"
+              tasks={inProgress}
+              onTaskClick={handleOpenTask}
+            />
+            <Column
+              title="Blocked 🚫"
+              titleClass="text-red-400"
+              tasks={blocked}
+              onTaskClick={handleOpenTask}
+            />
           </div>
 
           <aside className="rounded-2xl border border-slate-800 bg-slate-950/60 lg:border-l lg:rounded-l-none lg:pl-6 lg:pr-2">
@@ -215,6 +312,14 @@ export default async function TasksPage() {
           </aside>
         </div>
       </section>
+
+      <TaskDrawer
+        task={activeTask}
+        isOpen={drawerOpen}
+        onClose={handleCloseDrawer}
+        onSave={handleSaveTask}
+        onDelete={handleDeleteTask}
+      />
     </main>
   );
 }
