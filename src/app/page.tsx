@@ -1,4 +1,4 @@
-import { UserButton } from "@clerk/nextjs";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase";
 
 type Task = {
@@ -9,6 +9,7 @@ type Task = {
   priority: string;
   waiting_on?: string;
   due_date?: string;
+  created_at?: string;
 };
 
 type HeatMap = Record<string, number>;
@@ -66,6 +67,12 @@ function heatBadgeClass(count: number) {
   return "bg-yellow-400/20 text-yellow-200 border-yellow-400/40";
 }
 
+const statusDot: Record<string, string> = {
+  todo: "bg-slate-500",
+  in_progress: "bg-blue-400",
+  blocked: "bg-red-400"
+};
+
 export default async function Home() {
   const supabase = createClient();
   const startDate = new Date();
@@ -89,63 +96,57 @@ export default async function Home() {
     .order("priority", { ascending: true });
 
   const tasks = (tasksData ?? []) as Task[];
+  const teaserTasks = tasks
+    .filter((task) => task.status === "blocked" || task.status === "in_progress")
+    .slice(0, 3);
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="border-b border-slate-800 px-6 py-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
-              Market Ops
-            </p>
-            <h1 className="text-2xl font-semibold">Mission Control</h1>
-          </div>
-          <UserButton afterSignOutUrl="/sign-in" />
-        </div>
-        <p className="mt-3 text-sm text-slate-400 italic">
-          An autonomous organization of AI agents that does work for me and produces value 24/7
-        </p>
-      </header>
-
       {/* Tasks & Blockers */}
       <section className="mx-auto w-full max-w-5xl px-6 pt-8">
-        <h2 className="mb-4 text-xs uppercase tracking-[0.2em] text-slate-400">Tasks & Blockers</h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {tasks.length === 0 ? (
-            <p className="text-sm text-slate-500">No open tasks.</p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-xs uppercase tracking-[0.2em] text-slate-400">Tasks & Blockers</h2>
+          <Link
+            href="/tasks"
+            className="rounded-full border border-slate-800 bg-slate-900/60 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:border-slate-600 hover:text-white"
+          >
+            View Full Task Board →
+          </Link>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {teaserTasks.length === 0 ? (
+            <p className="text-sm text-slate-500">No blocked or in-progress tasks.</p>
           ) : (
-            tasks.map((task) => {
+            teaserTasks.map((task) => {
               const isBlocked = task.status === "blocked";
-              const isHigh = task.priority === "high";
+              const dotColor = statusDot[task.status] ?? "bg-slate-500";
               return (
                 <div
                   key={task.id}
                   className={`rounded-xl border p-4 ${
                     isBlocked
                       ? "border-red-500/30 bg-red-950/20"
-                      : isHigh
-                      ? "border-orange-500/20 bg-slate-900/60"
                       : "border-slate-800 bg-slate-900/40"
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-semibold leading-5 text-slate-100">{task.title}</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className={`h-2.5 w-2.5 rounded-full ${dotColor}`} />
+                      <p className="text-sm font-semibold leading-5 text-slate-100">{task.title}</p>
+                    </div>
                     <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider font-semibold ${
-                      isBlocked ? "bg-red-500/20 text-red-300" :
-                      task.status === "in_progress" ? "bg-blue-500/20 text-blue-300" :
-                      "bg-slate-700 text-slate-400"
+                      isBlocked ? "bg-red-500/20 text-red-300" : "bg-blue-500/20 text-blue-300"
                     }`}>
-                      {isBlocked ? "🚫 Blocked" : task.status === "in_progress" ? "In Progress" : "To Do"}
+                      {isBlocked ? "Blocked" : "In Progress"}
                     </span>
                   </div>
                   {task.description && (
-                    <p className="mt-2 text-xs leading-5 text-slate-400">{task.description}</p>
+                    <p className="mt-2 text-xs leading-5 text-slate-400 max-h-10 overflow-hidden">
+                      {task.description}
+                    </p>
                   )}
                   {task.waiting_on && (
-                    <p className="mt-2 text-xs text-red-400">⏳ Waiting on: {task.waiting_on}</p>
-                  )}
-                  {task.due_date && (
-                    <p className="mt-1 text-xs text-slate-500">Due: {new Date(task.due_date).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}</p>
+                    <p className="mt-2 text-xs text-red-400">Waiting on: {task.waiting_on}</p>
                   )}
                 </div>
               );
@@ -156,7 +157,9 @@ export default async function Home() {
 
       {/* Stock Feed */}
       <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-8">
-        <h2 className="text-xs uppercase tracking-[0.2em] text-slate-400">📈 Daily Stock Picks</h2>
+        <h2 className="text-xs uppercase tracking-[0.2em] text-slate-400">
+          Daily Stock Picks
+        </h2>
         {records.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-10 text-center">
             <h2 className="text-xl font-semibold">No recommendations yet</h2>
@@ -212,7 +215,7 @@ export default async function Home() {
                                 count
                               )}`}
                             >
-                              {ticker} · {count}
+                              {ticker} - {count}
                             </span>
                           ))
                         )}
