@@ -76,14 +76,19 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="flex items-center justify-between border-b border-slate-800 px-6 py-5">
-        <div>
-          <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
-            Market Ops
-          </p>
-          <h1 className="text-2xl font-semibold">Mission Control</h1>
+      <header className="border-b border-slate-800 px-6 py-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
+              Market Ops
+            </p>
+            <h1 className="text-2xl font-semibold">Mission Control</h1>
+          </div>
+          <UserButton afterSignOutUrl="/sign-in" />
         </div>
-        <UserButton afterSignOutUrl="/sign-in" />
+        <p className="mt-3 text-sm text-slate-400 italic">
+          An autonomous organization of AI agents that does work for me and produces value 24/7
+        </p>
       </header>
 
       <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-8">
