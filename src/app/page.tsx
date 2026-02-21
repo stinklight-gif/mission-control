@@ -50,7 +50,7 @@ function heatBadgeClass(count: number) {
 export default async function Home() {
   const supabase = createClient();
   const startDate = new Date();
-  startDate.setDate(startDate.getDate() - 6);
+  startDate.setDate(startDate.getDate() - 30);
   const startDateString = startDate.toISOString().slice(0, 10);
 
   const { data, error } = await supabase
