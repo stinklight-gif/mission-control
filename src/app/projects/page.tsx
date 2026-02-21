@@ -53,7 +53,7 @@ function getProgress(value?: number | null) {
   return Math.min(100, Math.max(0, Math.round(value)));
 }
 
-function isLaunchingSoon(value?: string | null, now: number) {
+function isLaunchingSoon(value: string | null | undefined, now: number) {
   if (!value) return false;
   const date = new Date(value);
   const time = date.getTime();
