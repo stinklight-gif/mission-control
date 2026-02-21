@@ -1,6 +1,16 @@
 import { UserButton } from "@clerk/nextjs";
 import { createClient } from "@/lib/supabase";
 
+type Task = {
+  id: string;
+  title: string;
+  description?: string;
+  status: string;
+  priority: string;
+  waiting_on?: string;
+  due_date?: string;
+};
+
 type HeatMap = Record<string, number>;
 
 type StockRecommendation = {
@@ -68,11 +78,17 @@ export default async function Home() {
     .gte("date", startDateString)
     .order("date", { ascending: false });
 
-  if (error) {
-    console.error("Supabase error:", error.message);
-  }
+  if (error) console.error("Supabase error:", error.message);
 
   const records = (data ?? []) as StockRecommendation[];
+
+  const { data: tasksData } = await supabase
+    .from("tasks")
+    .select("*")
+    .neq("status", "done")
+    .order("priority", { ascending: true });
+
+  const tasks = (tasksData ?? []) as Task[];
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
@@ -91,7 +107,56 @@ export default async function Home() {
         </p>
       </header>
 
+      {/* Tasks & Blockers */}
+      <section className="mx-auto w-full max-w-5xl px-6 pt-8">
+        <h2 className="mb-4 text-xs uppercase tracking-[0.2em] text-slate-400">Tasks & Blockers</h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {tasks.length === 0 ? (
+            <p className="text-sm text-slate-500">No open tasks.</p>
+          ) : (
+            tasks.map((task) => {
+              const isBlocked = task.status === "blocked";
+              const isHigh = task.priority === "high";
+              return (
+                <div
+                  key={task.id}
+                  className={`rounded-xl border p-4 ${
+                    isBlocked
+                      ? "border-red-500/30 bg-red-950/20"
+                      : isHigh
+                      ? "border-orange-500/20 bg-slate-900/60"
+                      : "border-slate-800 bg-slate-900/40"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-semibold leading-5 text-slate-100">{task.title}</p>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider font-semibold ${
+                      isBlocked ? "bg-red-500/20 text-red-300" :
+                      task.status === "in_progress" ? "bg-blue-500/20 text-blue-300" :
+                      "bg-slate-700 text-slate-400"
+                    }`}>
+                      {isBlocked ? "🚫 Blocked" : task.status === "in_progress" ? "In Progress" : "To Do"}
+                    </span>
+                  </div>
+                  {task.description && (
+                    <p className="mt-2 text-xs leading-5 text-slate-400">{task.description}</p>
+                  )}
+                  {task.waiting_on && (
+                    <p className="mt-2 text-xs text-red-400">⏳ Waiting on: {task.waiting_on}</p>
+                  )}
+                  {task.due_date && (
+                    <p className="mt-1 text-xs text-slate-500">Due: {new Date(task.due_date).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}</p>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </section>
+
+      {/* Stock Feed */}
       <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-8">
+        <h2 className="text-xs uppercase tracking-[0.2em] text-slate-400">📈 Daily Stock Picks</h2>
         {records.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-10 text-center">
             <h2 className="text-xl font-semibold">No recommendations yet</h2>
