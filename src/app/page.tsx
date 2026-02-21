@@ -30,15 +30,24 @@ function normalizeHeatMap(heatMap: HeatMap | null): [string, number][] {
   return Object.entries(heatMap).sort((a, b) => b[1] - a[1]);
 }
 
-function normalizeNewPicks(newPicks: unknown): string[] {
+type Pick = { ticker: string; thesis?: string; action?: string };
+
+function normalizeNewPicks(newPicks: unknown): Pick[] {
   if (!newPicks) return [];
   if (Array.isArray(newPicks)) {
-    return newPicks.map(String);
+    return newPicks.map((p) => {
+      if (typeof p === "object" && p !== null) {
+        const obj = p as Record<string, unknown>;
+        return {
+          ticker: String(obj.ticker || obj.name || "?"),
+          thesis: String(obj.thesis || obj.catalyst || obj.note || ""),
+          action: String(obj.action || "BUY"),
+        };
+      }
+      return { ticker: String(p) };
+    });
   }
-  if (typeof newPicks === "object") {
-    return Object.keys(newPicks as Record<string, unknown>);
-  }
-  return [String(newPicks)];
+  return [];
 }
 
 function heatBadgeClass(count: number) {
@@ -150,12 +159,18 @@ export default async function Home() {
                             No new picks
                           </li>
                         ) : (
-                          newPicks.map((pick) => (
+                          newPicks.map((pick, i) => (
                             <li
-                              key={pick}
+                              key={i}
                               className="rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm"
                             >
-                              {pick}
+                              <span className="font-semibold text-slate-100">{pick.ticker}</span>
+                              {pick.action && (
+                                <span className="ml-2 text-xs uppercase tracking-wider text-green-400">{pick.action}</span>
+                              )}
+                              {pick.thesis && (
+                                <p className="mt-1 text-xs text-slate-400 leading-5">{pick.thesis}</p>
+                              )}
                             </li>
                           ))
                         )}
