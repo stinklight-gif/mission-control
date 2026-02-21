@@ -1,0 +1,173 @@
+import { UserButton } from "@clerk/nextjs";
+import { createClient } from "@/lib/supabase";
+
+type HeatMap = Record<string, number>;
+
+type StockRecommendation = {
+  id: string;
+  date: string;
+  tickers: string[];
+  heat_map: HeatMap | null;
+  new_picks: unknown;
+  summary: string;
+  raw_data?: unknown | null;
+  created_at: string;
+};
+
+function formatDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "2-digit",
+    year: "numeric"
+  }).format(date);
+}
+
+function normalizeHeatMap(heatMap: HeatMap | null): [string, number][] {
+  if (!heatMap) return [];
+  return Object.entries(heatMap).sort((a, b) => b[1] - a[1]);
+}
+
+function normalizeNewPicks(newPicks: unknown): string[] {
+  if (!newPicks) return [];
+  if (Array.isArray(newPicks)) {
+    return newPicks.map(String);
+  }
+  if (typeof newPicks === "object") {
+    return Object.keys(newPicks as Record<string, unknown>);
+  }
+  return [String(newPicks)];
+}
+
+function heatBadgeClass(count: number) {
+  if (count >= 3) return "bg-red-500/20 text-red-200 border-red-500/40";
+  if (count === 2) return "bg-orange-500/20 text-orange-200 border-orange-500/40";
+  return "bg-yellow-400/20 text-yellow-200 border-yellow-400/40";
+}
+
+export default async function Home() {
+  const supabase = createClient();
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - 6);
+  const startDateString = startDate.toISOString().slice(0, 10);
+
+  const { data, error } = await supabase
+    .from("stock_recommendations")
+    .select("id, date, tickers, heat_map, new_picks, summary, raw_data, created_at")
+    .gte("date", startDateString)
+    .order("date", { ascending: false });
+
+  if (error) {
+    console.error("Supabase error:", error.message);
+  }
+
+  const records = (data ?? []) as StockRecommendation[];
+
+  return (
+    <main className="min-h-screen bg-slate-950 text-slate-100">
+      <header className="flex items-center justify-between border-b border-slate-800 px-6 py-5">
+        <div>
+          <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
+            Market Ops
+          </p>
+          <h1 className="text-2xl font-semibold">Mission Control</h1>
+        </div>
+        <UserButton afterSignOutUrl="/sign-in" />
+      </header>
+
+      <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-8">
+        {records.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 p-10 text-center">
+            <h2 className="text-xl font-semibold">No recommendations yet</h2>
+            <p className="mt-2 text-sm text-slate-400">
+              Once you load data into Supabase, the last 7 days of summaries will
+              appear here.
+            </p>
+          </div>
+        ) : (
+          records.map((record) => {
+            const heatEntries = normalizeHeatMap(record.heat_map);
+            const newPicks = normalizeNewPicks(record.new_picks);
+
+            return (
+              <article
+                key={record.id}
+                className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6 shadow-[0_0_0_1px_rgba(15,23,42,0.4)]"
+              >
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                        {formatDate(record.date)}
+                      </p>
+                      <h2 className="text-lg font-semibold text-slate-100">
+                        Daily Briefing
+                      </h2>
+                    </div>
+                    <div className="rounded-full border border-slate-700 px-4 py-1 text-xs uppercase tracking-[0.2em] text-slate-300">
+                      {record.tickers.join(", ")}
+                    </div>
+                  </div>
+
+                  <p className="text-sm leading-6 text-slate-200">
+                    {record.summary}
+                  </p>
+
+                  <div className="grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                        Heat Map
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {heatEntries.length === 0 ? (
+                          <span className="text-sm text-slate-500">
+                            No heat data
+                          </span>
+                        ) : (
+                          heatEntries.map(([ticker, count]) => (
+                            <span
+                              key={ticker}
+                              className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] ${heatBadgeClass(
+                                count
+                              )}`}
+                            >
+                              {ticker} · {count}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                        New Picks
+                      </p>
+                      <ul className="mt-3 grid gap-2">
+                        {newPicks.length === 0 ? (
+                          <li className="text-sm text-slate-500">
+                            No new picks
+                          </li>
+                        ) : (
+                          newPicks.map((pick) => (
+                            <li
+                              key={pick}
+                              className="rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm"
+                            >
+                              {pick}
+                            </li>
+                          ))
+                        )}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            );
+          })
+        )}
+      </section>
+    </main>
+  );
+}
