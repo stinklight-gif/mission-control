@@ -94,6 +94,51 @@ export default function TeamPage() {
       <section className="pt-10">
         <div className="mx-auto flex max-w-4xl items-center gap-4 text-xs uppercase tracking-[0.2em] text-slate-500">
           <div className="h-px flex-1 bg-slate-800" />
+          <span>PERSONAL LAYER</span>
+          <div className="h-px flex-1 bg-slate-800" />
+        </div>
+      </section>
+
+      <section className="pt-8">
+        <div className="mx-auto grid max-w-2xl gap-4 sm:grid-cols-2">
+          {[
+            {
+              name: "Ella",
+              role: "Health Assistant",
+              description: "Manages Rui's health protocols, recovery tracking, and medical research. Powered by a distilled knowledge base from years of research conversations.",
+              skills: ["Health", "Recovery", "Protocols"],
+              emoji: "🩺"
+            },
+            {
+              name: "Gina",
+              role: "Travel Assistant",
+              description: "Handles flights, hotels, itineraries, packing, and logistics. Carnivore-diet aware, Qantas points savvy, built for Rui's travel profile.",
+              skills: ["Travel", "Logistics", "Points"],
+              emoji: "✈️"
+            }
+          ].map((member) => (
+            <div key={member.name} className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">{member.emoji}</span>
+                <h3 className="text-lg font-semibold">{member.name}</h3>
+              </div>
+              <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-500">{member.role}</p>
+              <p className="mt-3 text-sm text-slate-300">{member.description}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {member.skills.map((skill) => (
+                  <span key={skill} className={tagClass}>
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="pt-10">
+        <div className="mx-auto flex max-w-4xl items-center gap-4 text-xs uppercase tracking-[0.2em] text-slate-500">
+          <div className="h-px flex-1 bg-slate-800" />
           <span>META LAYER</span>
           <div className="h-px flex-1 bg-slate-800" />
         </div>
