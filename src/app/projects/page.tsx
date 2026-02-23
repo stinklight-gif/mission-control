@@ -161,12 +161,15 @@ export default async function ProjectsPage() {
   const projects = (data ?? []) as Project[];
   const now = Date.now();
 
+  const activeProjects = projects.filter((project) => project.status !== "done");
+  const completedProjects = projects.filter((project) => project.status === "done");
+
   const inProgressCount = projects.filter((project) => project.status === "in_progress").length;
   const blockedCount = projects.filter((project) => project.status === "blocked").length;
   const launchingSoonCount = projects.filter((project) =>
     isLaunchingSoon(project.launch_date, now)
   ).length;
-  const doneCount = projects.filter((project) => project.status === "done").length;
+  const doneCount = completedProjects.length;
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
@@ -183,19 +186,33 @@ export default async function ProjectsPage() {
         </div>
       </section>
 
-      <section className="mx-auto w-full max-w-6xl px-6 pb-12 pt-8">
-        {projects.length === 0 ? (
+      <section className="mx-auto w-full max-w-6xl px-6 pb-6 pt-8">
+        {activeProjects.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/40 px-6 py-10 text-sm text-slate-500">
-            No projects yet.
+            No active projects.
           </div>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {projects.map((project) => (
+            {activeProjects.map((project) => (
               <ProjectCard key={project.id} project={project} />
             ))}
           </div>
         )}
       </section>
+
+      {completedProjects.length > 0 && (
+        <section className="mx-auto w-full max-w-6xl px-6 pb-12">
+          <div className="flex items-center gap-3 mb-4 mt-4">
+            <h2 className="text-sm uppercase tracking-[0.2em] text-slate-500">Completed ✅</h2>
+            <span className="text-xs text-slate-600">{completedProjects.length}</span>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {completedProjects.map((project) => (
+              <ProjectCard key={project.id} project={project} />
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   );
 }

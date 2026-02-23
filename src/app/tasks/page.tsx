@@ -26,7 +26,8 @@ type AgentActivity = {
 const statusDot: Record<string, string> = {
   todo: "bg-slate-500",
   in_progress: "bg-blue-400",
-  blocked: "bg-red-400"
+  blocked: "bg-red-400",
+  done: "bg-green-500"
 };
 
 function formatRelativeTime(value?: string) {
@@ -194,9 +195,9 @@ export default function TasksPage() {
   const blocked = tasks.filter((task) => task.status === "blocked");
   const inProgress = tasks.filter((task) => task.status === "in_progress");
   const backlog = tasks.filter((task) => task.status === "todo");
+  const doneTasks = tasks.filter((task) => task.status === "done");
   const total = tasks.length;
-  const done = tasks.filter((task) => task.status === "done").length;
-  const percentDone = total > 0 ? Math.round((done / total) * 100) : 0;
+  const percentDone = total > 0 ? Math.round((doneTasks.length / total) * 100) : 0;
 
   const handleOpenNew = () => {
     setActiveTask(null);
@@ -248,7 +249,7 @@ export default function TasksPage() {
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard label="Blocked" value={`${blocked.length}`} />
           <StatCard label="In Progress" value={`${inProgress.length}`} />
-          <StatCard label="Total" value={`${total}`} />
+          <StatCard label="Completed" value={`${doneTasks.length}`} />
           <StatCard label="Done" value={`${percentDone}%`} />
         </div>
       </section>
@@ -312,6 +313,20 @@ export default function TasksPage() {
           </aside>
         </div>
       </section>
+
+      {doneTasks.length > 0 && (
+        <section className="mx-auto w-full max-w-6xl px-6 pb-12">
+          <div className="flex items-center gap-3 mb-4">
+            <h2 className="text-sm uppercase tracking-[0.2em] text-green-500">Completed ✅</h2>
+            <span className="text-xs text-slate-500">{doneTasks.length}</span>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {doneTasks.map((task) => (
+              <TaskCard key={task.id} task={task} onClick={() => handleOpenTask(task)} />
+            ))}
+          </div>
+        </section>
+      )}
 
       <TaskDrawer
         task={activeTask}
