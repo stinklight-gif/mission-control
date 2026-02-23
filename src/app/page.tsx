@@ -41,7 +41,7 @@ function normalizeHeatMap(heatMap: HeatMap | null): [string, number][] {
   return Object.entries(heatMap).sort((a, b) => b[1] - a[1]);
 }
 
-type Pick = { ticker: string; thesis?: string; action?: string };
+type Pick = { ticker: string; thesis?: string; action?: string; recommender?: string };
 
 function normalizeNewPicks(newPicks: unknown): Pick[] {
   if (!newPicks) return [];
@@ -53,6 +53,7 @@ function normalizeNewPicks(newPicks: unknown): Pick[] {
           ticker: String(obj.ticker || obj.name || "?"),
           thesis: String(obj.thesis || obj.catalyst || obj.note || ""),
           action: String(obj.action || "BUY"),
+          recommender: obj.recommender ? String(obj.recommender) : undefined,
         };
       }
       return { ticker: String(p) };
@@ -237,10 +238,15 @@ export default async function Home() {
                               key={i}
                               className="rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm"
                             >
-                              <span className="font-semibold text-slate-100">{pick.ticker}</span>
-                              {pick.action && (
-                                <span className="ml-2 text-xs uppercase tracking-wider text-green-400">{pick.action}</span>
-                              )}
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-semibold text-slate-100">{pick.ticker}</span>
+                                {pick.action && (
+                                  <span className="text-xs uppercase tracking-wider text-green-400">{pick.action}</span>
+                                )}
+                                {pick.recommender && (
+                                  <span className="text-xs text-sky-400">@{pick.recommender}</span>
+                                )}
+                              </div>
                               {pick.thesis && (
                                 <p className="mt-1 text-xs text-slate-400 leading-5">{pick.thesis}</p>
                               )}
