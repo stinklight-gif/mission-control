@@ -46,14 +46,34 @@ export default function TeamPage() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-semibold">Samantha</h2>
-              <p className="mt-1 text-sm text-slate-400">Chief of Staff</p>
+              <p className="mt-1 text-sm text-slate-400">Executive Assistant</p>
             </div>
           </div>
           <p className="mt-4 text-sm text-slate-300">
-            Orchestrates, delegates, keeps everything moving. First point of contact between Rui and the machine.
+            Orchestrates agents, decomposes projects, ships autonomously. First point of contact between Rui and the machine.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            {["Orchestration", "Strategy", "Memory"].map((skill) => (
+            {["Orchestration", "Strategy", "Memory", "Agents"].map((skill) => (
+              <span key={skill} className={tagClass}>
+                {skill}
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="pt-8">
+        <div className="mx-auto max-w-2xl rounded-2xl border border-amber-500/30 bg-slate-900/50 p-6">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">📋</span>
+            <h2 className="text-2xl font-semibold">Riley</h2>
+          </div>
+          <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-500">Chief of Staff</p>
+          <p className="mt-4 text-sm text-slate-300">
+            Catches blockers, triages them, self-resolves what&apos;s possible, and surfaces only what&apos;s truly stuck — twice daily at 9 AM and 4 PM. Tracks autonomy score and fills gaps so escalations decrease over time.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {["Triage", "Blockers", "Briefings", "Autonomy"].map((skill) => (
               <span key={skill} className={tagClass}>
                 {skill}
               </span>
@@ -115,6 +135,20 @@ export default function TeamPage() {
               description: "Handles flights, hotels, itineraries, packing, and logistics. Carnivore-diet aware, Qantas points savvy, built for Rui's travel profile.",
               skills: ["Travel", "Logistics", "Points"],
               emoji: "✈️"
+            },
+            {
+              name: "Penny",
+              role: "Finance Assistant",
+              description: "Personal finance advisor — income, expenses, net worth, investments, tax strategy. ITIN, US credit cards, LLC compliance.",
+              skills: ["Finance", "Tax", "Planning"],
+              emoji: "💰"
+            },
+            {
+              name: "Buffett",
+              role: "Investment Advisor",
+              description: "Financial investment analysis — gold, silver, junior miners, oil, macro scenarios. Tracks portfolio positions and market signals.",
+              skills: ["Investing", "Macro", "Analysis"],
+              emoji: "📈"
             }
           ].map((member) => (
             <div key={member.name} className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5">
