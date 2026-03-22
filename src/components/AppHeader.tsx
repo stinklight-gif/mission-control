@@ -8,6 +8,7 @@ const navLinks = [
   { href: "/", label: "Dashboard" },
   { href: "/tasks", label: "Tasks" },
   { href: "/projects", label: "Projects" },
+  { href: "/finance", label: "Finance" },
   { href: "/calendar", label: "Calendar" },
   { href: "/docs", label: "Docs" },
   { href: "/team", label: "Team" }
