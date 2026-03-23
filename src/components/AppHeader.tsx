@@ -11,7 +11,8 @@ const navLinks = [
   { href: "/finance", label: "Finance" },
   { href: "/calendar", label: "Calendar" },
   { href: "/docs", label: "Docs" },
-  { href: "/team", label: "Team" }
+  { href: "/team", label: "Team" },
+  { href: "/decisions", label: "Decisions" }
 ];
 
 function isActiveLink(pathname: string, href: string) {
