@@ -61,29 +61,66 @@ function getVerdictColor(verdict: string | null) {
   return "text-amber-400";
 }
 
+function parseSynthesis(synthesis: string | null) {
+  if (!synthesis) return { voteDisplay: null, avgDisplay: null, verdictText: "", conditions: [] };
+
+  const voteMatch = synthesis.match(/\*\*Vote:\*\*\s*(.+?)(?:\n|$)/);
+  const voteDisplay = voteMatch ? voteMatch[1].trim() : null;
+
+  const avgMatch = synthesis.match(/avg:\s*([\d.]+)\/10/);
+  const avgDisplay = avgMatch ? avgMatch[1] : null;
+
+  // Extract conditions block
+  const condMatch = synthesis.match(/\*\*Conditions mentioned by the council:\*\*\n([\s\S]+?)(?:\n\n|\*\*|$)/);
+  const conditions: string[] = condMatch
+    ? condMatch[1].split("\n").map(l => l.trim()).filter(Boolean)
+    : [];
+
+  // Verdict text: the paragraph after the vote line
+  const lines = synthesis.split("\n\n");
+  const verdictText = lines.length > 1 ? lines[1].trim() : "";
+
+  return { voteDisplay, avgDisplay, verdictText, conditions };
+}
+
 // ─── Seat Card ────────────────────────────────────────────────────────────────
 
 function SeatCard({ seat }: { seat: SeatResponse }) {
   const [expanded, setExpanded] = useState(false);
-  const preview = seat.response.slice(0, 200);
-  const hasMore = seat.response.length > 200;
+  const preview = seat.response.slice(0, 280);
+  const hasMore = seat.response.length > 280;
 
   const modelLabel = seat.model === "gemini-pro" ? "Gemini 2.5 Pro"
     : seat.model === "gemini-flash" ? "Gemini 2.5 Flash"
     : "Kimi";
 
+  const isYes = seat.score !== null && seat.score > 5;
+  const voteBadgeClass = isYes
+    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+    : "bg-red-500/20 text-red-300 border border-red-500/40";
+
+  const scoreColor = seat.score === null ? "text-slate-400"
+    : seat.score > 7 ? "text-emerald-400"
+    : seat.score > 5 ? "text-amber-400"
+    : "text-red-400";
+
   return (
     <div className="border border-slate-700/50 rounded-lg p-4 bg-slate-800/30">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">{seat.emoji}</span>
-          <span className="font-medium text-sm text-slate-200">{seat.seat}</span>
-          <span className="text-xs text-slate-500 bg-slate-700/50 px-2 py-0.5 rounded">{modelLabel}</span>
+      <div className="flex items-start justify-between mb-3 gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-xl flex-shrink-0">{seat.emoji}</span>
+          <div>
+            <span className="font-medium text-sm text-slate-200 block">{seat.seat}</span>
+            <span className="text-xs text-slate-500 bg-slate-700/50 px-1.5 py-0.5 rounded">{modelLabel}</span>
+          </div>
         </div>
         {seat.score !== null && (
-          <span className={`text-sm font-bold ${seat.score > 7 ? "text-emerald-400" : seat.score > 5 ? "text-amber-400" : "text-red-400"}`}>
-            {seat.score}/10
-          </span>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className={`text-2xl font-bold ${scoreColor}`}>{seat.score}/10</span>
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${voteBadgeClass}`}>
+              {isYes ? "YES" : "NO"}
+            </span>
+          </div>
         )}
       </div>
       <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
@@ -102,7 +139,45 @@ function SeatCard({ seat }: { seat: SeatResponse }) {
   );
 }
 
-// ─── Decision Card ────────────────────────────────────────────────────────────
+// ─── Synthesis Block ──────────────────────────────────────────────────────────
+
+function SynthesisBlock({ decision }: { decision: Decision }) {
+  const { voteDisplay, avgDisplay, verdictText, conditions } = parseSynthesis(decision.synthesis);
+  const voteColor = getVerdictColor(voteDisplay);
+
+  return (
+    <div className="border border-slate-600/50 rounded-lg p-5 bg-slate-800/60 space-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        {voteDisplay && (
+          <span className={`text-lg font-bold ${voteColor}`}>{voteDisplay}</span>
+        )}
+        {avgDisplay && (
+          <span className="text-sm text-slate-400 bg-slate-700/60 px-2 py-0.5 rounded">
+            avg {avgDisplay}/10
+          </span>
+        )}
+      </div>
+      {verdictText && (
+        <p className="text-sm text-slate-300 leading-relaxed">{verdictText}</p>
+      )}
+      {conditions.length > 0 && (
+        <div>
+          <p className="text-xs uppercase tracking-wider text-slate-500 mb-1.5">Conditions</p>
+          <ul className="space-y-1">
+            {conditions.map((c, i) => (
+              <li key={i} className="text-sm text-slate-400 flex gap-2">
+                <span className="text-amber-500 mt-0.5">•</span>
+                <span>{c}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Decision Card (Past) ─────────────────────────────────────────────────────
 
 function DecisionCard({
   decision,
@@ -162,6 +237,14 @@ function DecisionCard({
       {/* Expanded content */}
       {expanded && (
         <div className="border-t border-slate-700/50 p-5 space-y-5">
+          {/* Synthesis first */}
+          {decision.synthesis && (
+            <div>
+              <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">Synthesis</p>
+              <SynthesisBlock decision={decision} />
+            </div>
+          )}
+
           {/* Context */}
           {decision.context && (
             <div>
@@ -178,18 +261,6 @@ function DecisionCard({
                 {seatList.map((seat) => (
                   <SeatCard key={seat.seat} seat={seat} />
                 ))}
-              </div>
-            </div>
-          )}
-
-          {/* Synthesis */}
-          {decision.synthesis && (
-            <div>
-              <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">Synthesis</p>
-              <div className="border border-slate-700/50 rounded-lg p-4 bg-slate-800/50">
-                <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">
-                  {decision.synthesis}
-                </p>
               </div>
             </div>
           )}
@@ -235,33 +306,55 @@ function CouncilLoading() {
     { emoji: "🟣", name: "Second-Order" }
   ];
   const [activeSeat, setActiveSeat] = useState(0);
+  const [dots, setDots] = useState(".");
 
   useEffect(() => {
-    const interval = setInterval(() => {
+    const seatInterval = setInterval(() => {
       setActiveSeat(prev => (prev + 1) % seats.length);
-    }, 2000);
-    return () => clearInterval(interval);
+    }, 8000);
+    return () => clearInterval(seatInterval);
   }, [seats.length]);
 
+  useEffect(() => {
+    const dotInterval = setInterval(() => {
+      setDots(prev => prev.length >= 3 ? "." : prev + ".");
+    }, 500);
+    return () => clearInterval(dotInterval);
+  }, []);
+
   return (
-    <div className="border border-slate-700/50 rounded-xl bg-slate-900/60 p-8 text-center">
-      <p className="text-slate-300 font-medium mb-6">Council is deliberating...</p>
+    <div className="border border-amber-500/20 rounded-xl bg-amber-950/10 p-8 text-center">
+      <p className="text-slate-200 font-medium text-lg mb-1">Council is deliberating{dots}</p>
+      <p className="text-slate-500 text-sm mb-8">This takes 30–60 seconds while 5 seats deliberate</p>
+      
+      {/* Progress bar */}
+      <div className="w-full bg-slate-800 rounded-full h-1.5 mb-8 overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full animate-pulse"
+          style={{ width: `${((activeSeat + 1) / seats.length) * 100}%`, transition: "width 7s ease" }}
+        />
+      </div>
+
       <div className="flex justify-center gap-6 flex-wrap">
         {seats.map((seat, i) => (
           <div
             key={seat.name}
-            className={`flex flex-col items-center gap-1 transition-all duration-500 ${
+            className={`flex flex-col items-center gap-1.5 transition-all duration-700 ${
               i === activeSeat
                 ? "scale-125 opacity-100"
-                : "scale-100 opacity-40"
+                : i < activeSeat
+                ? "scale-100 opacity-70"
+                : "scale-90 opacity-30"
             }`}
           >
             <span className="text-3xl">{seat.emoji}</span>
-            <span className="text-xs text-slate-500">{seat.name}</span>
+            <span className="text-xs text-slate-400 text-center max-w-[70px]">{seat.name}</span>
+            {i < activeSeat && <span className="text-xs text-emerald-500">✓</span>}
+            {i === activeSeat && <span className="text-xs text-amber-400 animate-pulse">…</span>}
           </div>
         ))}
       </div>
-      <p className="text-slate-500 text-sm mt-6 italic">
+      <p className="text-amber-400/70 text-sm mt-6 italic">
         {seats[activeSeat].emoji} {seats[activeSeat].name} is analyzing...
       </p>
     </div>
@@ -358,6 +451,7 @@ export default function DecisionsPage() {
   const totalDecisions = decisions.length;
   const resolvedDecisions = decisions.filter(d => d.outcome !== "pending");
   const goodCalls = decisions.filter(d => d.outcome === "good").length;
+  const pendingCount = decisions.filter(d => d.outcome === "pending").length;
   const goodPct = resolvedDecisions.length > 0
     ? Math.round((goodCalls / resolvedDecisions.length) * 100)
     : 0;
@@ -381,13 +475,21 @@ export default function DecisionsPage() {
         </p>
       </div>
 
-      {/* Stats */}
+      {/* Stats banner */}
       {totalDecisions > 0 && (
-        <div className="flex flex-wrap gap-4 text-sm text-slate-400">
-          <span><span className="text-slate-200 font-medium">{totalDecisions}</span> decisions tracked</span>
+        <div className="flex flex-wrap items-center gap-1.5 text-sm text-slate-400 bg-slate-900/40 border border-slate-800 rounded-lg px-4 py-2.5">
+          <span className="text-slate-200 font-medium">{totalDecisions}</span>
+          <span>decisions tracked</span>
           {resolvedDecisions.length > 0 && (
-            <span><span className="text-emerald-400 font-medium">{goodPct}%</span> good calls ({resolvedDecisions.length} resolved)</span>
+            <>
+              <span className="text-slate-700">·</span>
+              <span className="text-emerald-400 font-medium">{goodPct}%</span>
+              <span>good calls</span>
+            </>
           )}
+          <span className="text-slate-700">·</span>
+          <span className="text-amber-400 font-medium">{pendingCount}</span>
+          <span>pending</span>
         </div>
       )}
 
@@ -403,7 +505,7 @@ export default function DecisionsPage() {
             value={question}
             onChange={e => setQuestion(e.target.value)}
             placeholder="Should I spend $5K on FB ads for HeroTales?"
-            rows={3}
+            rows={4}
             className="w-full bg-slate-800/60 border border-slate-700 rounded-lg px-4 py-3 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-slate-500 resize-none"
           />
         </div>
@@ -415,7 +517,7 @@ export default function DecisionsPage() {
           <textarea
             value={context}
             onChange={e => setContext(e.target.value)}
-            placeholder="Any background that helps the council..."
+            placeholder="Any background that helps the council understand the situation..."
             rows={2}
             className="w-full bg-slate-800/60 border border-slate-700 rounded-lg px-4 py-3 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-slate-500 resize-none"
           />
@@ -468,9 +570,10 @@ export default function DecisionsPage() {
         <button
           onClick={handleRunCouncil}
           disabled={!question.trim() || running}
-          className="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium rounded-lg transition"
+          style={{ background: question.trim() && !running ? "linear-gradient(135deg, #f59e0b, #ea580c)" : undefined }}
+          className="px-6 py-3 disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-slate-700 text-sm font-semibold rounded-lg transition text-white shadow-lg hover:opacity-90"
         >
-          {running ? "Council deliberating..." : "Run Council →"}
+          {running ? "⏳ Council deliberating..." : "Run Council →"}
         </button>
       </div>
 
@@ -479,33 +582,38 @@ export default function DecisionsPage() {
 
       {/* Current report */}
       {currentDecision && !running && (
-        <div className="border border-emerald-500/20 rounded-xl bg-emerald-950/20 p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-medium text-emerald-300">✅ Council Report</h3>
+        <div className="border border-emerald-500/20 rounded-xl bg-emerald-950/20 p-5 space-y-5">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <h3 className="font-semibold text-emerald-300 text-lg">✅ Council Report</h3>
             {currentDecision.vote_split && (
-              <span className={`text-sm font-bold ${getVerdictColor(currentDecision.vote_split)}`}>
+              <span className={`text-base font-bold ${getVerdictColor(currentDecision.vote_split)}`}>
                 {currentDecision.vote_split}
-                {currentDecision.avg_score !== null && ` (avg ${Number(currentDecision.avg_score).toFixed(1)}/10)`}
+                {currentDecision.avg_score !== null && (
+                  <span className="text-slate-400 text-sm font-normal ml-2">
+                    avg {Number(currentDecision.avg_score).toFixed(1)}/10
+                  </span>
+                )}
               </span>
             )}
           </div>
 
-          {/* Seat responses */}
-          {currentDecision.responses && (
-            <div className="space-y-3">
-              {Object.values(currentDecision.responses).map((seat) => (
-                <SeatCard key={seat.seat} seat={seat} />
-              ))}
+          {/* Synthesis at top */}
+          {currentDecision.synthesis && (
+            <div>
+              <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">Synthesis</p>
+              <SynthesisBlock decision={currentDecision} />
             </div>
           )}
 
-          {/* Synthesis */}
-          {currentDecision.synthesis && (
-            <div className="border border-slate-700/50 rounded-lg p-4 bg-slate-800/50">
-              <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">Synthesis</p>
-              <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">
-                {currentDecision.synthesis}
-              </p>
+          {/* Seat responses */}
+          {currentDecision.responses && (
+            <div>
+              <p className="text-xs uppercase tracking-wider text-slate-500 mb-3">Council Responses</p>
+              <div className="space-y-3">
+                {Object.values(currentDecision.responses).map((seat) => (
+                  <SeatCard key={seat.seat} seat={seat} />
+                ))}
+              </div>
             </div>
           )}
         </div>
