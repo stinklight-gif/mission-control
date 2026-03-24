@@ -317,11 +317,11 @@ Steps:
 
 // ─── Seat Definitions ──────────────────────────────────────────────────────────
 const SEATS = [
-  { id: 'devils_advocate', name: "Devil's Advocate", emoji: '🔴', framework: FRAMEWORK_DEVILS_ADVOCATE, model: 'gemini-thinking' },
-  { id: 'opportunist',     name: 'Opportunist',      emoji: '🟢', framework: FRAMEWORK_OPPORTUNIST,    model: OPENAI_KEY ? 'gemini-pro' : 'gemini-pro' },
-  { id: 'operator',        name: 'Operator',         emoji: '🔵', framework: FRAMEWORK_OPERATOR,       model: 'kimi' },
-  { id: 'historian',       name: 'Historian',        emoji: '🟡', framework: FRAMEWORK_HISTORIAN,      model: 'gemini-thinking' },
-  { id: 'second_order',    name: 'Second-Order',     emoji: '🟣', framework: FRAMEWORK_SECOND_ORDER,   model: 'kimi' },
+  { id: 'devils_advocate', name: "Devil's Advocate", emoji: '🔴', framework: FRAMEWORK_DEVILS_ADVOCATE, model: 'gemini-thinking', modelName: 'Gemini 3.1 Pro', provider: 'gemini' },
+  { id: 'opportunist',     name: 'Opportunist',      emoji: '🟢', framework: FRAMEWORK_OPPORTUNIST,    model: 'openai',           modelName: 'GPT-5.4',          provider: 'openai' },
+  { id: 'operator',        name: 'Operator',         emoji: '🔵', framework: FRAMEWORK_OPERATOR,       model: 'kimi',             modelName: 'Kimi moonshot-v1-32k', provider: 'kimi' },
+  { id: 'historian',       name: 'Historian',        emoji: '🟡', framework: FRAMEWORK_HISTORIAN,      model: 'gemini-thinking',  modelName: 'Gemini 3.1 Pro',   provider: 'gemini' },
+  { id: 'second_order',    name: 'Second-Order Thinker', emoji: '🟣', framework: FRAMEWORK_SECOND_ORDER, model: 'kimi',          modelName: 'Kimi moonshot-v1-32k', provider: 'kimi' },
 ] as const;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -427,6 +427,37 @@ async function callKimi(frameworkPrompt: string, decisionPrompt: string): Promis
   return json?.choices?.[0]?.message?.content ?? '';
 }
 
+async function callOpenAIStandard(prompt: string): Promise<string> {
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_KEY}` },
+    body: JSON.stringify({
+      model: 'gpt-5.4',
+      messages: [{ role: 'user', content: prompt }],
+      max_completion_tokens: 2000
+    })
+  });
+  if (!res.ok) throw new Error(`OpenAI error ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  const json = await res.json();
+  return json?.choices?.[0]?.message?.content ?? '';
+}
+
+async function callOpenAIPro(prompt: string): Promise<string> {
+  const res = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_KEY}` },
+    body: JSON.stringify({
+      model: 'gpt-5.4-pro',
+      input: prompt,
+      max_output_tokens: 16000,
+      reasoning: { effort: 'high' }
+    })
+  });
+  if (!res.ok) throw new Error(`OpenAI Pro error ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  const json = await res.json();
+  return json?.output?.find((i: { type: string }) => i.type === 'message')?.content?.find((c: { type: string }) => c.type === 'output_text')?.text ?? '';
+}
+
 async function callSeat(
   model: string,
   framework: string,
@@ -434,7 +465,8 @@ async function callSeat(
   context: string,
   type: string,
   reversibility: string,
-  pressure: string
+  pressure: string,
+  proMode = false
 ): Promise<string> {
   const fullPrompt = buildPrompt(framework, question, context, type, reversibility, pressure);
 
@@ -444,6 +476,8 @@ async function callSeat(
     text = await callGeminiThinking(fullPrompt);
   } else if (model === 'gemini-pro') {
     text = await callGeminiPro(fullPrompt);
+  } else if (model === 'openai') {
+    text = proMode ? await callOpenAIPro(fullPrompt) : await callOpenAIStandard(fullPrompt);
   } else if (model === 'kimi') {
     // For Kimi, split framework as system message and decision as user message
     const decisionSection = `## Decision Under Review
@@ -467,6 +501,8 @@ Now analyze this decision using your frameworks above. Use the business context 
       text = await callGeminiThinking(fullPrompt);
     } else if (model === 'gemini-pro') {
       text = await callGeminiPro(fullPrompt);
+    } else if (model === 'openai') {
+      text = proMode ? await callOpenAIPro(fullPrompt) : await callOpenAIStandard(fullPrompt);
     } else if (model === 'kimi') {
       const decisionSection = `## Decision Under Review
 
@@ -510,7 +546,8 @@ export async function POST(req: NextRequest) {
     context = "",
     type = "strategy",
     reversibility = "moderate",
-    pressure = "no_rush"
+    pressure = "no_rush",
+    pro = false,
   } = body;
 
   if (!question?.trim()) {
@@ -519,11 +556,15 @@ export async function POST(req: NextRequest) {
 
   const responses: Record<string, string> = {};
   const scores: Record<string, number> = {};
+  const roundResponses: Array<{ seatId: string; name: string; emoji: string; modelName: string; score: number; response: string }> = [];
 
   // Run all 5 seats sequentially with 2s delay between each
   for (let i = 0; i < SEATS.length; i++) {
     const seat = SEATS[i];
     if (i > 0) await sleep(2000);
+
+    const isProSeat = pro && seat.id === 'opportunist';
+    const effectiveModelName = isProSeat ? 'GPT-5.4 Pro' : seat.modelName;
 
     try {
       const text = await callSeat(
@@ -533,14 +574,17 @@ export async function POST(req: NextRequest) {
         context,
         type,
         reversibility,
-        pressure
+        pressure,
+        isProSeat
       );
       responses[seat.id] = text;
       scores[seat.id] = extractScore(text);
+      roundResponses.push({ seatId: seat.id, name: seat.name, emoji: seat.emoji, modelName: effectiveModelName, score: scores[seat.id], response: text });
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       responses[seat.id] = `(error: ${errMsg.slice(0, 200)})`;
       scores[seat.id] = 5;
+      roundResponses.push({ seatId: seat.id, name: seat.name, emoji: seat.emoji, modelName: effectiveModelName, score: 5, response: responses[seat.id] });
     }
   }
 
@@ -550,6 +594,19 @@ export async function POST(req: NextRequest) {
   const yesVotes = scoreValues.filter(s => s > 5).length;
   const noVotes = scoreValues.length - yesVotes;
   const verdictText = `${yesVotes}-${noVotes} ${yesVotes > noVotes ? 'YES' : 'NO'} (avg: ${avgScore.toFixed(1)}/10)`;
+
+  // Build structured responses (backward compat + enriched)
+  const structuredResponses: Record<string, { seat: string; emoji: string; model: string; modelName: string; response: string; score: number }> = {};
+  for (const seat of SEATS) {
+    structuredResponses[seat.id] = {
+      seat: seat.name,
+      emoji: seat.emoji,
+      model: seat.model,
+      modelName: pro && seat.id === 'opportunist' ? 'GPT-5.4 Pro' : seat.modelName,
+      response: responses[seat.id] ?? '',
+      score: scores[seat.id] ?? 5,
+    };
+  }
 
   // Save to Supabase
   const supabase = createClient();
@@ -561,13 +618,11 @@ export async function POST(req: NextRequest) {
       decision_type: type,
       reversibility,
       time_pressure: pressure,
-      responses: {
-        devils_advocate: responses.devils_advocate,
-        opportunist: responses.opportunist,
-        operator: responses.operator,
-        historian: responses.historian,
-        second_order: responses.second_order
-      },
+      pro_mode: pro,
+      responses: structuredResponses,
+      rounds: [roundResponses],
+      follow_ups: [],
+      context_updates: [],
       synthesis: verdictText,
       vote_split: `${yesVotes}-${noVotes} ${yesVotes > noVotes ? 'YES' : 'NO'}`,
       avg_score: parseFloat(avgScore.toFixed(2)),
