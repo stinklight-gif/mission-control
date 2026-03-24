@@ -110,6 +110,40 @@ function scoreArrow(prev: number, curr: number) {
   return null;
 }
 
+// ─── Inline Seat Summary (for past decision cards) ────────────────────────────
+
+function InlineSeatSummary({ seat }: { seat: RoundResponse }) {
+  const [showFull, setShowFull] = useState(false);
+  const preview = seat.response.slice(0, 200);
+  const scoreColor = seat.score > 5 ? "text-emerald-400" : seat.score < 5 ? "text-red-400" : "text-amber-400";
+  const badge = seat.score > 5 ? "YES" : "NO";
+  const badgeColor = seat.score > 5 ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-red-500/20 text-red-400 border-red-500/30";
+
+  return (
+    <div className="border border-slate-700/40 rounded-lg p-3 bg-slate-800/30">
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-2">
+          <span>{seat.emoji}</span>
+          <span className="text-sm font-medium text-slate-200">{seat.name}</span>
+          <span className="text-xs text-slate-500 bg-slate-700/50 px-1.5 py-0.5 rounded">{seat.modelName}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`text-lg font-bold ${scoreColor}`}>{seat.score}/10</span>
+          <span className={`text-xs px-1.5 py-0.5 rounded border font-semibold ${badgeColor}`}>{badge}</span>
+        </div>
+      </div>
+      <p className="text-xs text-slate-400 leading-relaxed whitespace-pre-wrap">
+        {showFull ? seat.response : preview}{!showFull && seat.response.length > 200 ? "..." : ""}
+      </p>
+      {seat.response.length > 200 && (
+        <button onClick={() => setShowFull(!showFull)} className="text-xs text-indigo-400 hover:text-indigo-300 mt-1">
+          {showFull ? "Show less ↑" : "Show full response ↓"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── Loading animation ────────────────────────────────────────────────────────
 
 function CouncilLoading({ activeSeatIndex = 0, total = 5, mode = "initial" }: { activeSeatIndex?: number; total?: number; mode?: string }) {
@@ -641,28 +675,54 @@ function PastDecisionCard({
       </div>
 
       {expanded && (
-        <div className="border-t border-slate-700/50 p-4">
-          <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">Outcome</p>
-          <div className="flex flex-wrap gap-2">
-            {["good", "bad", "mixed", "pending"].map((o) => {
-              const info = OUTCOME_LABELS[o];
-              const isActive = decision.outcome === o;
-              return (
-                <button
-                  key={o}
-                  disabled={updatingOutcome !== null}
-                  onClick={() => handleOutcome(o)}
-                  className={`text-xs px-3 py-1.5 rounded border transition ${
-                    isActive
-                      ? info.color + " font-semibold"
-                      : "border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300"
-                  } ${updatingOutcome === o ? "opacity-50" : ""}`}
-                >
-                  {info.emoji} {info.label}
-                </button>
-              );
-            })}
+        <div className="border-t border-slate-700/50 p-4 space-y-4">
+          <div>
+            <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">Outcome</p>
+            <div className="flex flex-wrap gap-2">
+              {["good", "bad", "mixed", "pending"].map((o) => {
+                const info = OUTCOME_LABELS[o];
+                const isActive = decision.outcome === o;
+                return (
+                  <button
+                    key={o}
+                    disabled={updatingOutcome !== null}
+                    onClick={() => handleOutcome(o)}
+                    className={`text-xs px-3 py-1.5 rounded border transition ${
+                      isActive
+                        ? info.color + " font-semibold"
+                        : "border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300"
+                    } ${updatingOutcome === o ? "opacity-50" : ""}`}
+                  >
+                    {info.emoji} {info.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
+
+          {/* Inline seat responses */}
+          {rounds.length > 0 && rounds[0].length > 0 && (
+            <div>
+              <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">Council Responses</p>
+              <div className="space-y-2">
+                {rounds[0].map((seat) => (
+                  <InlineSeatSummary key={seat.seatId} seat={seat} />
+                ))}
+              </div>
+              {rounds.length > 1 && (
+                <p className="text-xs text-slate-600 mt-2 italic">
+                  + {rounds.length - 1} more round{rounds.length > 2 ? "s" : ""} — click to view full debate ↑
+                </p>
+              )}
+            </div>
+          )}
+
+          {decision.synthesis && (
+            <div>
+              <p className="text-xs uppercase tracking-wider text-slate-500 mb-1">Synthesis</p>
+              <p className="text-xs text-slate-400 leading-relaxed">{decision.synthesis.slice(0, 300)}{decision.synthesis.length > 300 ? "..." : ""}</p>
+            </div>
+          )}
         </div>
       )}
     </div>
