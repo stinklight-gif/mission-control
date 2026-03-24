@@ -5,8 +5,8 @@ import { createClient } from "@/lib/supabase";
 export const maxDuration = 120; // 2 minutes (requires Vercel Pro plan)
 
 // ─── API Keys ─────────────────────────────────────────────────────────────────
-const GEMINI_KEY = process.env.GEMINI_API_KEY || 'AIzaSyBeAvoG91ToRpu9PwSC-Abg6IkvnW7iZ90';
-const KIMI_KEY = process.env.KIMI_API_KEY || 'sk-Tp0lCqAFZ2yeeTuhiWY4JtydaVk2agySfsUTjJ6aHrcfrBLR';
+const GEMINI_KEY = process.env.GEMINI_API_KEY || '';
+const KIMI_KEY = process.env.KIMI_API_KEY || '';
 const OPENAI_KEY = process.env.OPENAI_API_KEY || '';
 
 // ─── Framework Prompts (embedded — cannot read from filesystem on Vercel) ──────
